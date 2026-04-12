@@ -1,0 +1,189 @@
+VBA Add-Student Macro (UserForm + Module)
+
+Purpose:
+- Adds an interactive form to insert a new student row into your sheet (e.g. "Tradicional" or your alumni DB sheet).
+- Tries to detect header row and writes values into matching columns (case-insensitive). If a target header doesn't exist, it will add the header as a new column.
+
+Files/objects to create in the VBA editor:
+1) UserForm named: AddStudentForm
+   Controls (add these controls and set the Name property exactly):
+   - Label and TextBox: lblName / txtName
+   - Label and TextBox: lblProfesor / txtProfesor
+   - Label and TextBox: lblStatus / txtStatus  (default: "Activo")
+   - Label and TextBox: lblClase / txtClase
+   - Label and TextBox: lblDuracion / txtDuracion
+   - Label and TextBox: lblHorario / txtHorario
+   - Label and TextBox: lblDia / txtDia
+   - Label and TextBox: lblClases / txtClases  (default: 4)
+   - Label and TextBox: lblPagoProp / txtPagoProp
+   - Label and TextBox: lblRecibo / txtRecibo
+   - CommandButton: cmdAdd  (Caption: "Add Student")
+   - CommandButton: cmdCancel (Caption: "Cancel")
+
+2) Standard Module named: AddStudentModule
+   - Contains a simple sub to show the form: ShowAddStudentForm
+
+VBA code to paste
+=================
+--- Module: AddStudentModule ---
+Option Explicit
+
+Public Sub ShowAddStudentForm()
+    AddStudentForm.Show vbModal
+End Sub
+
+
+--- UserForm code: AddStudentForm (paste into the UserForm code window) ---
+Option Explicit
+
+Private Sub UserForm_Initialize()
+    ' Default values
+    On Error Resume Next
+    txtStatus.Text = "Activo"
+    txtClases.Text = "4"
+    On Error GoTo 0
+End Sub
+
+Private Function FindHeaderColumn(ws As Worksheet, headerNames As Variant) As Long
+    ' Looks for any of the headerNames (case-insensitive) in the top 20 rows, returns column index or 0 if not found
+    Dim r As Long, c As Long, lastCol As Long, cellVal As String
+    lastCol = ws.Cells(1, ws.Columns.Count).End(xlToLeft).Column
+    For r = 1 To 20
+        For c = 1 To lastCol
+            cellVal = Trim(CStr(ws.Cells(r, c).Value))
+            If Len(cellVal) > 0 Then
+                Dim nm As Variant
+                For Each nm In headerNames
+                    If UCase(cellVal) = UCase(CStr(nm)) Then
+                        FindHeaderColumn = c
+                        Exit Function
+                    End If
+                Next nm
+            End If
+        Next c
+    Next r
+    FindHeaderColumn = 0
+End Function
+
+Private Function EnsureHeader(ws As Worksheet, wantedNames As Variant) As Long
+    ' Try to find any of wantedNames; if none found, append a new column with the first name and return its column
+    Dim col As Long
+    col = FindHeaderColumn(ws, wantedNames)
+    If col > 0 Then
+        EnsureHeader = col
+        Exit Function
+    End If
+
+    ' none found - append at rightmost column + 1
+    Dim lastCol As Long
+    lastCol = ws.Cells(1, ws.Columns.Count).End(xlToLeft).Column
+    col = lastCol + 1
+    ws.Cells(1, col).Value = wantedNames(0)
+    EnsureHeader = col
+End Function
+
+Private Function DetectHeaderRow(ws As Worksheet) As Long
+    ' Detects which row contains headers by scanning first 20 rows for a likely header word
+    Dim r As Long, c As Long, lastCol As Long, cellVal As String
+    lastCol = ws.Cells(1, ws.Columns.Count).End(xlToLeft).Column
+    For r = 1 To 20
+        For c = 1 To lastCol
+            cellVal = Trim(CStr(ws.Cells(r, c).Value))
+            If Len(cellVal) > 0 Then
+                If InStr(1, UCase(cellVal), "ALUMNO") > 0 Or InStr(1, UCase(cellVal), "NOMBRE") > 0 Or InStr(1, UCase(cellVal), "PROF") > 0 Or InStr(1, UCase(cellVal), "STATUS") > 0 Then
+                    DetectHeaderRow = r
+                    Exit Function
+                End If
+            End If
+        Next c
+    Next r
+    ' fallback to first row
+    DetectHeaderRow = 1
+End Function
+
+Private Sub cmdAdd_Click()
+    On Error GoTo ErrHandler
+    Dim ws As Worksheet
+    Dim sheetName As String
+    sheetName = "Tradicional" ' change if your alumni DB sheet name is different
+    Set ws = ThisWorkbook.Worksheets(sheetName)
+
+    Dim headerRow As Long
+    headerRow = DetectHeaderRow(ws)
+
+    ' Determine the insert row (first blank row after header)
+    Dim lastRow As Long
+    lastRow = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
+    If lastRow < headerRow Then lastRow = headerRow
+    Dim insertRow As Long
+    insertRow = lastRow + 1
+
+    ' Map fields to header names (try several alternatives)
+    Dim colName As Long
+    colName = EnsureHeader(ws, Array("ALUMNO", "Alumno", "Nombre"))
+    ws.Cells(insertRow, colName).Value = Trim(txtName.Text)
+
+    colName = EnsureHeader(ws, Array("PROFESOR", "Profesor", "Maestro"))
+    ws.Cells(insertRow, colName).Value = Trim(txtProfesor.Text)
+
+    colName = EnsureHeader(ws, Array("Status", "STATUS", "ESTADO"))
+    ws.Cells(insertRow, colName).Value = Trim(txtStatus.Text)
+
+    colName = EnsureHeader(ws, Array("CLASE", "Clase", "Tipo"))
+    ws.Cells(insertRow, colName).Value = Trim(txtClase.Text)
+
+    colName = EnsureHeader(ws, Array("DURACIÓN", "Duracion", "Duración", "Dur"))
+    ws.Cells(insertRow, colName).Value = Trim(txtDuracion.Text)
+
+    colName = EnsureHeader(ws, Array("HORARIO", "Horario", "Hora"))
+    ws.Cells(insertRow, colName).Value = Trim(txtHorario.Text)
+
+    colName = EnsureHeader(ws, Array("DÍA", "DIA", "Dia"))
+    ws.Cells(insertRow, colName).Value = Trim(txtDia.Text)
+
+    colName = EnsureHeader(ws, Array("Clases", "CLASES"))
+    ws.Cells(insertRow, colName).Value = Trim(txtClases.Text)
+
+    colName = EnsureHeader(ws, Array("Pago Prop", "Pago", "Propina"))
+    ws.Cells(insertRow, colName).Value = Trim(txtPagoProp.Text)
+
+    colName = EnsureHeader(ws, Array("RECIBO ACTUAL", "Recibo", "RECIBO"))
+    ws.Cells(insertRow, colName).Value = Trim(txtRecibo.Text)
+
+    ' Optionally format the inserted row (thin borders)
+    Dim c As Long, lastCol As Long
+    lastCol = ws.Cells(headerRow, ws.Columns.Count).End(xlToLeft).Column
+    For c = 1 To lastCol
+        ws.Cells(insertRow, c).Borders.LineStyle = xlContinuous
+    Next c
+
+    MsgBox "Student added at row " & insertRow, vbInformation
+    Me.Hide
+    Exit Sub
+
+ErrHandler:
+    MsgBox "Error adding student: " & Err.Description, vbExclamation
+End Sub
+
+Private Sub cmdCancel_Click()
+    Me.Hide
+End Sub
+
+
+Instructions
+============
+1) Open your Excel file, press Alt+F11 to open the VBA editor.
+2) Insert -> Module. Paste the Module code (AddStudentModule) into the module.
+3) Insert -> UserForm. In the UserForm properties change the (Name) to AddStudentForm.
+4) Add the controls listed above to the form and set their (Name) properties exactly.
+   - You can use the Toolbox to place Labels and TextBoxes and two CommandButtons.
+5) Double-click the UserForm background and paste the entire UserForm code.
+6) Save the workbook as a macro-enabled workbook (.xlsm).
+7) Back in Excel, optionally add a button (Developer tab -> Insert -> Form Controls -> Button), place it on the sheet and assign macro: ShowAddStudentForm
+
+Notes and customization
+- If your alumni DB sheet has a different name, edit the sheetName variable inside the UserForm code (cmdAdd_Click) or change it to prompt the user.
+- The code tries to detect existing headers and reuses them; if a header is missing it appends it to the rightmost column.
+- You can extend the form with more fields; for each new textbox add a EnsureHeader + assignment like above.
+
+If you want, I can generate a ready-to-import exported .bas or .frm file you can import into the VBA Project; tell me whether you prefer a single module-only macro or a full UserForm importable file and I'll prepare it.
