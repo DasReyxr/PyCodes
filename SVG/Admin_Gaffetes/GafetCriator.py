@@ -19,7 +19,8 @@ for prefix, uri in namespaces.items():
 
 NS_SVG = '{http://www.w3.org/2000/svg}'
 NS_XLINK = '{http://www.w3.org/1999/xlink}'
-PATH = os.path.dirname(os.path.abspath(__file__)) + os.sep
+ABS_PATH = os.path.dirname(os.path.abspath(__file__))
+OUTPUT_PATH = os.path.join(ABS_PATH, "output")  # Carpeta de salida para los PDFs generados
 
 
 
@@ -34,7 +35,7 @@ def buscar_imagen_por_id(carpeta, identificador, extensiones=EXTENSIONES_IMAGEN)
     """
     identificador = str(identificador).strip()
     for ext in extensiones:
-        candidato  = f"{PATH}{carpeta + os.sep}{identificador}{ext}"
+        candidato  = os.path.join(ABS_PATH, carpeta, f"{identificador}{ext}")
         if os.path.exists(candidato):
             return candidato
     return None
@@ -111,8 +112,6 @@ def agregar_codigo_barras(root, codigo, x_mm=30, y_mm=25, width_mm=45, height_mm
     contenedor.insert(indice, img_elem)  
 
 
-
-
 def reemplazar_manteniendo_estilo(elem, nuevo_texto):
     tspans = elem.findall(f'.//{NS_SVG}tspan')
 
@@ -133,7 +132,7 @@ def reemplazar_manteniendo_estilo(elem, nuevo_texto):
         elem.text = str(nuevo_texto)
 
 
-def agregar_imagen_yp(root, x=120, y=150, width=40, height=40, ruta_imagen=f"{PATH}YP.png"):
+def agregar_imagen_yp(root, x=120, y=150, width=40, height=40, ruta_imagen=f"{ABS_PATH}YP.png"):
     """
     Inserta YP.png embebida en base64 en la posición (x, y) del SVG.
     Ajusta width/height y x/y según las unidades reales de tu Template.svg
@@ -155,7 +154,7 @@ def agregar_imagen_yp(root, x=120, y=150, width=40, height=40, ruta_imagen=f"{PA
 
 
 def generar_gafete(persona):
-    tree = ET.parse(f"{PATH}Template.svg")
+    tree = ET.parse(os.path.join(ABS_PATH, "Template.svg"))
     root = tree.getroot()
 
     campos = {
@@ -175,7 +174,7 @@ def generar_gafete(persona):
 
     # --- Nuevo: agregar YP.png si el rol es Young Professionals ---
     if campos['role'].strip().lower() == 'young professionals':
-        agregar_imagen_yp(root, x=30, y=35, width=20, height=20, ruta_imagen=f"{PATH}YP.png")
+        agregar_imagen_yp(root, x=30, y=35, width=20, height=20, ruta_imagen=os.path.join(ABS_PATH, "YP.png"))
 
     # --- Código de barras del ID, debajo del texto "number" ---
     agregar_codigo_barras(
@@ -194,9 +193,11 @@ def generar_gafete(persona):
     num_id = str(persona.get('number', 'sin_id')).strip()
     nombre_persona = str(persona.get('name', 'sin_nombre')).strip().replace(' ', '_')
 
+    if not os.path.exists(OUTPUT_PATH):
+        os.makedirs(OUTPUT_PATH)
 
-    temp_svg = f"{PATH}temp_{num_id}.svg"
-    output_pdf = f"{PATH}gafete_{num_id}_{nombre_persona}.pdf"
+    temp_svg = os.path.join(ABS_PATH, f"temp_{num_id}.svg")
+    output_pdf = os.path.join(OUTPUT_PATH, f"gafete_{num_id}_{nombre_persona}.pdf")
 
     tree.write(temp_svg, encoding="utf-8", xml_declaration=True)
 
@@ -217,7 +218,7 @@ def generar_gafete(persona):
 
 
 def procesar_csv():
-    with open(f"{PATH}data.csv", mode="r", encoding="utf-8-sig") as file:
+    with open(os.path.join(ABS_PATH, "data.csv"), mode="r", encoding="utf-8-sig") as file:
         reader = csv.DictReader(file)
         for fila in reader:
             fila_limpia = {str(k).strip(): str(v).strip() for k, v in fila.items() if k}
