@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orange Pi · Servidor local</title>
+<meta name="description" content="Página de inicio del servidor local en la Orange Pi.">
+<style>
+  :root {
+    --mask: #14372d;        /* soldermask */
+    --mask-deep: #0e2a22;
+    --silk: #eef1e6;        /* serigrafía */
+    --silk-dim: #a9b9ad;
+    --copper: #d9a441;      /* pads de cobre */
+    --line: rgba(238, 241, 230, .18);
+    --sans: "Avenir Next", "Segoe UI", "Helvetica Neue", system-ui, sans-serif;
+    --mono: ui-monospace, "SF Mono", "DejaVu Sans Mono", Menlo, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--mask);
+    color: var(--silk);
+    font-family: var(--sans);
+    line-height: 1.55;
+    padding: clamp(1.25rem, 4vw, 3rem);
+  }
+
+  main { max-width: 56rem; margin: 0 auto; }
+
+  /* ---------- Cabecera ---------- */
+  .host-line {
+    margin: 0 0 .5rem;
+    color: var(--silk-dim);
+    font-size: 1rem;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(2.25rem, 8.5vw, 5.5rem);
+    font-weight: 800;
+    letter-spacing: -.035em;
+    line-height: 1;
+    overflow-wrap: anywhere;
+  }
+
+  .lede {
+    max-width: 38rem;
+    margin: 1.25rem 0 0;
+    color: var(--silk-dim);
+    font-size: 1.125rem;
+  }
+
+  /* ---------- Cabezal de 40 pines ---------- */
+  .header-strip {
+    margin: 2.5rem 0 3rem;
+    padding: .9rem 1rem;
+    background: var(--mask-deep);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    overflow-x: auto;
+  }
+  .header-strip svg { display: block; width: 100%; min-width: 32rem; height: auto; }
+  .pad { fill: none; stroke: var(--silk-dim); stroke-width: 1.5; }
+  .pad.sq { rx: 1.5; }
+  .pad.on { fill: var(--copper); stroke: var(--copper); }
+  .pad.pin { opacity: 0; animation: fill-in .35s ease-out forwards; }
+  @keyframes fill-in { to { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) {
+    .pad.pin { animation: none; opacity: 1; }
+  }
+
+  /* ---------- Servicios ---------- */
+  h2 {
+    margin: 0 0 1rem;
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: -.01em;
+  }
+
+  .services { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+
+  .services a {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: .25rem 1.5rem;
+    align-items: baseline;
+    padding: 1.1rem .25rem;
+    border-bottom: 1px solid var(--line);
+    color: inherit;
+    text-decoration: none;
+  }
+  .services a:hover { background: rgba(238, 241, 230, .05); }
+  .services a:focus-visible {
+    outline: 2px solid var(--copper);
+    outline-offset: -2px;
+  }
+
+  .s-name { font-size: 1.125rem; font-weight: 650; }
+  .s-port { font-family: var(--mono); font-size: .9rem; color: var(--copper); }
+  .s-desc { grid-column: 1 / -1; color: var(--silk-dim); font-size: .975rem; }
+
+  .empty { color: var(--silk-dim); }
+
+  /* ---------- Pie ---------- */
+  footer {
+    margin-top: 3rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--line);
+    color: var(--silk-dim);
+    font-size: .9rem;
+  }
+  footer code {
+    font-family: var(--mono);
+    background: var(--mask-deep);
+    padding: .1rem .4rem;
+    border-radius: 3px;
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <p class="host-line">Estás conectado a</p>
+    <h1 id="host">orange-pi</h1>
+    <p class="lede">Servidor local en una Orange Pi con Debian. Todo lo que ves aquí corre en esta placa y se alcanza por Tailscale.</p>
+  </header>
+
+  <!-- Cabezal de 40 pines (2 × 20), decorativo -->
+  <div class="header-strip" aria-hidden="true">
+    <svg id="pins" viewBox="0 0 400 44" xmlns="http://www.w3.org/2000/svg"></svg>
+  </div>
+
+  <section aria-labelledby="serv-title">
+    <h2 id="serv-title">Servicios en esta placa</h2>
+    <ul class="services" id="services"></ul>
+  </section>
+
+  <footer>
+    Para agregar un servicio, edita la lista <code>SERVICIOS</code> al final de <code>index.html</code>.
+  </footer>
+</main>
+
+<script>
+  /* ====== Edita esta lista ====== */
+  const SERVICIOS = [
+    { nombre: "Esta página",      puerto: 8080, desc: "Servida por nginx desde /var/www/misitio." },
+    { nombre: "Mi segundo proyecto", puerto: 5000, desc: "Descripción corta de lo que hace." }
+  ];
+  /* ============================== */
+
+  // Nombre del equipo, tomado de la URL con la que entraste
+  const host = location.hostname || "localhost";
+  document.getElementById("host").textContent = host;
+  document.title = host + " · Servidor local";
+
+  // Lista de servicios: cada enlace usa el mismo host con el puerto indicado
+  const ul = document.getElementById("services");
+  if (SERVICIOS.length === 0) {
+    const li = document.createElement("li");
+    li.className = "empty";
+    li.textContent = "Aún no hay servicios. Agrega uno en la lista SERVICIOS.";
+    ul.appendChild(li);
+  }
+  SERVICIOS.forEach(s => {
+    const li = document.createElement("li");
+    const a = document.createElement("a");
+    a.href = (location.protocol === "file:" ? "http:" : location.protocol) + "//" + host + ":" + s.puerto;
+
+    const n = document.createElement("span");
+    n.className = "s-name";
+    n.textContent = s.nombre;
+
+    const p = document.createElement("span");
+    p.className = "s-port";
+    p.textContent = ":" + s.puerto;
+
+    a.append(n, p);
+    if (s.desc) {
+      const d = document.createElement("span");
+      d.className = "s-desc";
+      d.textContent = s.desc;
+      a.appendChild(d);
+    }
+    li.appendChild(a);
+    ul.appendChild(li);
+  });
+
+  // Cabezal de 40 pines: 2 filas × 20, el pin 1 es cuadrado y de cobre
+  const svg = document.getElementById("pins");
+  const NS = "http://www.w3.org/2000/svg";
+  for (let col = 0; col < 20; col++) {
+    for (let row = 0; row < 2; row++) {
+      const x = 10 + col * 19.5;
+      const y = 8 + row * 20;
+      const el = document.createElementNS(NS, col === 0 && row === 0 ? "rect" : "circle");
+      if (el.tagName === "rect") {
+        el.setAttribute("x", x - 6); el.setAttribute("y", y - 6);
+        el.setAttribute("width", 12); el.setAttribute("height", 12);
+        el.setAttribute("class", "pad sq on");
+      } else {
+        el.setAttribute("cx", x); el.setAttribute("cy", y); el.setAttribute("r", 6);
+        el.setAttribute("class", "pad pin");
+        el.style.animationDelay = (col * 45) + "ms";
+      }
+      svg.appendChild(el);
+    }
+  }
+</script>
+</body>
+</html>
